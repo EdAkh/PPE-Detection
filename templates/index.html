@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
+    <meta charset="UTF-8">
     <link rel="stylesheet" href='/static/main.css' />
 </head>
-
 <body>
     <div class="grid-container">
         <div id="content-container" class="grid-item">
             <h1>PPE Detection Flask App</h1>
             <br>
-            <form action="/" method="post" enctype="multipart/form-data">
+            <form action="/uploadFile" method="post" enctype="multipart/form-data">
                 <input type="file" name="uploaded-file">
                 <input type="submit" value="Upload">
             </form>
@@ -25,20 +24,21 @@
             <div id="success-message" style="display:none;">
                 <p style="color:green;">File uploaded successfully</p>
             </div>
+            <button type="button" id="show-image">Show Image</button>
             <br>
             <div class="slidecontainer">
-                <input type="range" min="1" max="100" value="50" class="slider" id="myRange">
+                <input type="range" name="confidence" id="confidenceSlider" min="0" max="1" step="0.01" value="0.5">
+                <span id="confidenceValue">0.5</span>
             </div>
             <br>
             <form action="/detect_object" method="post">
                 <input type="submit" value="Detect Object" />
             </form>
+            <button type="button" id="show-annotated-image">Show Annotated Image</button>
         </div>
-        <div id="detected-image-container" class="grid-item">
-            <img id="detected-image" src="{{ url_for('static', filename='uploads/annotated.jpg') }}" width="1000" height="640">
-            <pre id="jsonOutput" class="codeblock"> here is your json</pre>
+        <div id="image-container" class="grid-item">
+            <!-- Use placeholders for the src attribute -->
+            <img id="image-display" width="1000" height="640">
         </div>
     </div>
     <script src="{{ url_for('static', filename='main.js') }}"></script>
-</body>
-</html>
