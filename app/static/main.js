@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Get references to elements
     const contentContainer = document.getElementById("content-container");
     const detectForm = document.getElementById("detect-form");
-    const detectedImageContainer = document.getElementById("detected-image-container");
+    const imageContainer = document.getElementById("image-container");
 
     // Function to toggle the text color and display the success message
     function showSuccessMessage() {
@@ -26,8 +26,17 @@ document.addEventListener("DOMContentLoaded", function () {
         showSuccessMessage();
     }
 
+    var confidenceSlider = document.getElementById("confidenceSlider");
+    var confidenceValue = document.getElementById("confidenceValue");
+
+    confidenceSlider.oninput = function() {
+        confidenceValue.innerHTML = this.value;
+    }
+
+
+    console.log(detectForm);
     // Attach an event listener to the detection form
-    detectForm.addEventListener("submit", function (event) {
+    detectForm?.addEventListener("submit", function (event) {
         event.preventDefault();
 
         // Use AJAX to submit the form data to the /detect_object route
@@ -40,7 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
         .then((response) => response.text()) // Convert the response to text
         .then((data) => {
             // Update the content container with the response data
-            contentContainer.innerHTML = data;
+            imageContainer.innerHTML = data;
 
             // Example: You can call toggleTextColor when the upload is successful
             // Replace this with the actual logic of your upload process
@@ -55,4 +64,37 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
+        const showImageButton = document.getElementById('show-image');
+        const showAnnotatedImageButton = document.getElementById('show-annotated-image');
+        const imageDisplay = document.getElementById('image-display');
+
+        showImageButton.addEventListener('click', () => {
+            fetch('/display', {
+                method: 'GET',
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const imageUrl = URL.createObjectURL(blob);
+                imageDisplay.src = imageUrl;
+                imageDisplay.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error fetching image:', error);
+            });
+        });
+
+        showAnnotatedImageButton.addEventListener('click', () => {
+            fetch('/display_detection', {
+                method: 'GET',
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const imageUrl = URL.createObjectURL(blob);
+                imageDisplay.src = imageUrl;
+                imageDisplay.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error fetching annotated image:', error);
+            });
+        });
 });

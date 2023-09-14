@@ -1,15 +1,14 @@
 import os
-import torch
 import cv2
-from flask import Flask, render_template, request, session, send_file, Response
+from flask import Flask, render_template, request, Response
 import requests
-from super_gradients.training import models
-import supervision as sv
+from ppedetectionmodel import perform_inference, visualize_detections
+from data_storing import create_database, store_image, store_annotated_image
+from PIL import Image
 from io import BytesIO
 from werkzeug.utils import secure_filename
-import secret
 import sqlite3
-import base64
+from fetchimage import fetch_image
 
 UPLOAD_FOLDER = os.path.join('app', 'static', 'uploads')
 
@@ -17,79 +16,6 @@ UPLOAD_FOLDER = os.path.join('app', 'static', 'uploads')
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Retrieve the secret key from the environment variable
-secret_key = secret.secret_key
-
-# Set the secret key for session management
-app.secret_key = secret_key
-
-model_arch = 'yolo_nas_l'
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-classes = ['ear protection', 'hard hat', 'high visibility vest', 'mask', 'no glove', 'no helmet', 'no safety boot', 'no vest', 'safety boot', 'safety glasses', 'safety gloves']
-
-#Load the model outside the route function to load it only once
-model = models.get(model_arch, num_classes=len(classes), checkpoint_path=r"C:\Users\edw75\test\model_train\ckpt_best.pth")
-model.to(device)
-model.eval()
-
-def perform_inference(image):
-    #Perform inference using the model's predict function
-    
-    result = model.predict(image, conf=0.5)[0]
-    detections = sv.Detections(
-        xyxy=result.prediction.bboxes_xyxy,
-        confidence=result.prediction.confidence,
-        class_id=result.prediction.labels.astype(int)
-    )
-    return detections
-
-def visualize_detections(image, detections):
-    annotated_image = image.copy()
-
-    box_annotator = sv.BoxAnnotator()
-
-    labels = [
-        f"{classes[class_id]} {confidence:.2f}"
-        for class_id, confidence
-        in zip(detections.class_id, detections.confidence)
-    ]
-    annotated_image = box_annotator.annotate(image.copy(), detections=detections, labels=labels)
-
-    return annotated_image
-
-def create_database():
-    conn = sqlite3.connect('image_database.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS images (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            image_name TEXT,
-            image_data BLOB
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS annotated_images (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            annotated_image_name TEXT,
-            annotated_image_data BLOB
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-def store_image(image_name, image_data):
-    conn = sqlite3.connect('image_database.db')
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO images (image_name, image_data) VALUES (?, ?)', (image_name, image_data))
-    conn.commit()
-    conn.close()
-
-def store_annotated_image(annotated_image_name, annotated_image_data):
-    conn = sqlite3.connect('image_database.db')
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO annotated_images (annotated_image_name, annotated_image_data) VALUES (?, ?)', (annotated_image_name, annotated_image_data))
-    conn.commit()
-    conn.close()
 
 @app.route('/')
 def index():
@@ -109,7 +35,6 @@ def uploadFile():
                 # Store the image data in the database
                 store_image(image_name, image_data)
 
-                session['uploaded_file_path'] = image_name
                 if file_extension in ('.jpg', '.jpeg', '.png', '.gif'):
                     return render_template('index.html')
 
@@ -126,8 +51,6 @@ def download_image():
 
             # Store the downloaded image data in the database
             store_image(image_name, image_data)
-
-            session['url_file_path'] = image_name
 
         return render_template('index.html')
 
@@ -159,7 +82,7 @@ def displayDetection():
         cursor.execute('SELECT annotated_image_data FROM annotated_images WHERE id = ?', (annotated_image_id,))
         annotated_image_data = cursor.fetchone()[0]
         conn.close()
-        return Response(annotated_image_data, mimetype='image/*')
+        return Response(annotated_image_data, mimetype='image/jpeg')
 
     except Exception as e:
         return str(e), 500
@@ -169,28 +92,30 @@ def displayDetection():
 def detectObject():
     #confidence_threshold = request.form.get('confidence', '0.5')  # Default to 0.5 if 'confidence' is not provided
     #confidence_threshold = float(confidence_threshold)    
-    uploaded_file_path = session.get('uploaded_file_path', None)
-    url_file_path = session.get('url_file_path', None)
     image = None
     annotated_image_name = None
     annotated_image_path = None
 
-    if uploaded_file_path:
-        detections = perform_inference(uploaded_file_path)
-        image = cv2.imread(uploaded_file_path)
+    image_name, image_data = fetch_image()
 
-    elif url_file_path:
-        detections = perform_inference(url_file_path)
-        image = cv2.imread(url_file_path)
+    temp_directory = 'temp_file' # Define a temporary path
 
+    image_path = os.path.join('app', temp_directory, image_name)
+
+    with open(image_path, 'wb') as file:
+        file.write(image_data)
+    
+    detections = perform_inference(image_path)
+    image = cv2.imread(image_path)
+        
     if image is not None:
         annotated_image = visualize_detections(image, detections)
 
         # Get the original image extension
-        _, image_extension = os.path.splitext(uploaded_file_path or url_file_path)
+        _, image_extension = os.path.splitext(image_name)
         image_extension = image_extension.lower()
 
-        original_file_name = os.path.basename(uploaded_file_path or url_file_path)
+        original_file_name = os.path.basename(image_name)
         annotated_image_name = 'annotated_' + original_file_name + image_extension
         # Create a temporary path for the annotated image with the same format
         annotated_image_path = os.path.join(app.config['UPLOAD_FOLDER'], annotated_image_name)
