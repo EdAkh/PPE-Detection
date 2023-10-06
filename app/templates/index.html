@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Include a CSS stylesheet from the '/static/' directory -->
+    <link rel="stylesheet" href='/static/main.css' />
+</head>
+<body>
+    <div class="grid-container">
+        <div id="content-container" class="grid-item">
+            <!-- Application Title -->
+            <h1>PPE Detection Flask App</h1>
+            <br>
+            <!-- Form for uploading files -->
+            <form action="/uploadFile" method="post" id="uploadform" enctype="multipart/form-data">
+                <input type="file" name="uploaded-file">
+                <input type="submit" value="Upload">
+            </form>
+
+            <!-- Form for downloading files from URLs -->
+            <form action="/downloadFile" method="post" id="downloadform">
+                <input type="text" name="image-url" placeholder="Image URL">
+                <input type="submit" value="Download">
+            </form>
+            <br> 
+            <!-- Status message for file upload -->
+            <p id="upload-status" style="color:blue;">Choose input media to load (only .jpg, .jpeg, .png and .gif).</p>
+            
+            <!-- Display success message (hidden by default) -->
+            <div id="success-message" style="display:none;"></div>
+            <br>
+            <!-- Button to show the uploaded image -->
+            <button type="button" id="show-image">Show Image</button>
+            
+            <!-- Form for object detection -->
+            <form action="/detect_object" method="post">
+                <input type="submit" value="Detect Object"/>
+            </form>
+            
+            <!-- Button to show the annotated image -->
+            <button type="button" id="show-annotated-image">Show Annotated Image</button>
+        </div>
+        
+        <div id="image-container" class="grid-item">
+            <!-- Placeholder for displaying the image -->
+            <img id="image-display" width="1000" height="640">
+        </div>
+    </div>
+    
+    <!-- Include a JavaScript file from the '/static/' directory -->
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
